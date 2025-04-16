@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="미국 대형주 100 수익률 비교", layout="wide")
 
+# -------- 스타일 --------
 st.markdown("""
     <style>
     .dataframe td, .dataframe th {
@@ -15,6 +16,7 @@ st.markdown("""
 
 st.title("📊 미국 시가총액 상위 100 기업 수익률 대시보드")
 
+# -------- 상위 100 티커 가져오기 --------
 @st.cache_data
 def get_top_100_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -27,10 +29,12 @@ ticker_list = top100['Symbol'].tolist()
 company_names = top100['Security'].tolist()
 ticker_map = dict(zip(ticker_list, company_names))
 
-selected = st.multiselect("👑 기업 선택 (기본 10개)", ticker_list, default=ticker_list[:10])
+# -------- 사용자 선택 UI --------
+selected = st.multiselect("👑 기업 선택", ticker_list)  # ✅ 기본 선택 없이 전체만 보여줌
 highlighted = st.multiselect("⭐ 강조할 기업 선택", selected)
 show_name = st.checkbox("기업 이름으로 표시", value=True)
 
+# -------- 데이터 수집 --------
 @st.cache_data
 def get_price_data(tickers):
     end = datetime.today()
@@ -38,6 +42,7 @@ def get_price_data(tickers):
     data = yf.download(tickers, start=start, end=end, auto_adjust=True)['Close']
     return data
 
+# -------- 수익률 계산 --------
 def calculate_returns(df, periods):
     returns = {}
     for label, days in periods.items():
@@ -45,6 +50,7 @@ def calculate_returns(df, periods):
         returns[label] = (ret * 100).round(2)
     return pd.DataFrame(returns)
 
+# -------- 강조 스타일 --------
 def highlight_favorites(row):
     ticker = row.name.split(' ')[0]
     if ticker in highlighted:
@@ -52,12 +58,14 @@ def highlight_favorites(row):
     else:
         return [''] * len(row)
 
+# -------- 안전한 format 함수 --------
 def safe_format(val):
     try:
         return f"{val:.2f}"
     except:
         return val
 
+# -------- 수익률 계산 구간 --------
 periods = {
     '1일': 1,
     '1주일': 5,
@@ -68,6 +76,7 @@ periods = {
     '5년': 1260,
 }
 
+# -------- 실행 --------
 if selected:
     with st.spinner("📥 데이터 불러오는 중..."):
         df = get_price_data(selected)
