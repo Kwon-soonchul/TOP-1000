@@ -35,7 +35,7 @@ company_names = top100['Security'].tolist()
 ticker_map = dict(zip(ticker_list, company_names))
 
 # ✅ 항상 전체 선택된 상태로 실행
-selected = ticker_list
+selected = ticker_list[:10]
 
 # ⭐ 강조할 기업 선택 가능
 highlighted = st.multiselect("⭐ 강조할 기업 선택", ticker_list)
