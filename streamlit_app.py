@@ -34,9 +34,13 @@ ticker_list = top100['Symbol'].tolist()
 company_names = top100['Security'].tolist()
 ticker_map = dict(zip(ticker_list, company_names))
 
-# -------- 사용자 선택 UI --------
-selected = st.multiselect("👑 기업 선택", ticker_list)
-highlighted = st.multiselect("⭐ 강조할 기업 선택", selected)
+# ✅ 항상 전체 선택된 상태로 실행
+selected = ticker_list
+
+# ⭐ 강조할 기업 선택 가능
+highlighted = st.multiselect("⭐ 강조할 기업 선택", ticker_list)
+
+# ✅ 기업명 표시 여부
 show_name = st.checkbox("기업 이름으로 표시", value=True)
 
 # -------- 가격 데이터 수집 --------
@@ -82,24 +86,21 @@ periods = {
 }
 
 # -------- 실행 --------
-if selected:
-    with st.spinner("📥 데이터 불러오는 중..."):
-        df = get_price_data(selected)
-        return_df = calculate_returns(df, periods).fillna('-')
+with st.spinner("📥 데이터 불러오는 중..."):
+    df = get_price_data(selected)
+    return_df = calculate_returns(df, periods).fillna('-')
 
-        if show_name:
-            return_df.index = [f"{ticker} ({ticker_map.get(ticker, ticker)})" for ticker in return_df.index]
+    if show_name:
+        return_df.index = [f"{ticker} ({ticker_map.get(ticker, ticker)})" for ticker in return_df.index]
 
-        st.markdown("### 💹 기간별 수익률 (%)", unsafe_allow_html=True)
-        st.dataframe(
-            return_df.style
-                .apply(highlight_favorites, axis=1)
-                .format(safe_format),
-            use_container_width=True
-        )
+    st.markdown("### 💹 기간별 수익률 (%)", unsafe_allow_html=True)
+    st.dataframe(
+        return_df.style
+            .apply(highlight_favorites, axis=1)
+            .format(safe_format),
+        use_container_width=True
+    )
 
-        pick = st.selectbox("📈 개별 주가 그래프 보기", selected)
-        if pick:
-            st.line_chart(df[pick])
-else:
-    st.info("기업을 선택해주세요.")
+    pick = st.selectbox("📈 개별 주가 그래프 보기", selected)
+    if pick:
+        st.line_chart(df[pick])
