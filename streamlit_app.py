@@ -6,14 +6,12 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="시가총액 TOP 100 수익률 대시보드", layout="wide")
 st.title("📊 시가총액 기준 TOP 100 미국 주식 수익률")
 
-# ------------------ S&P500 티커 가져오기 ------------------
 @st.cache_data
 def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     table = pd.read_html(url)[0]
     return table['Symbol'].tolist()
 
-# ------------------ 시가총액 기준 정렬 ------------------
 @st.cache_data
 def get_marketcap_top100(tickers):
     data = []
@@ -30,23 +28,23 @@ def get_marketcap_top100(tickers):
     df = df.sort_values(by='MarketCap', ascending=False).head(100).reset_index(drop=True)
     return df
 
-# ------------------ 주가 데이터 ------------------
 @st.cache_data
 def get_price_data(tickers):
     end = datetime.today()
-    start = end - timedelta(days=3*365)
+    start = end - timedelta(days=4*365)  # [MODIFIED] 3년 데이터 확보 위해 4년치 요청
     data = yf.download(tickers, start=start, end=end, auto_adjust=True)['Close']
     return data
 
-# ------------------ 수익률 계산 ------------------
 def calculate_returns(df, periods):
     returns = {}
     for label, days in periods.items():
-        ret = df.pct_change(periods=days).iloc[-1]
-        returns[label] = (ret * 100).round(2)
+        try:
+            ret = df.pct_change(periods=days).iloc[-1]
+            returns[label] = (ret * 100).round(2)
+        except:
+            returns[label] = pd.Series('-')
     return pd.DataFrame(returns)
 
-# ------------------ 강조 스타일 함수 ------------------
 def highlight_starred(row):
     raw = row.name
     ticker = raw.replace('★ ', '').split(' ')[0]
@@ -54,32 +52,31 @@ def highlight_starred(row):
         return ['background-color: #fff8b3'] * len(row)
     return [''] * len(row)
 
-# ------------------ 안전한 포맷 함수 ------------------
 def safe_format(val):
     try:
         return f"{val:.2f}"
     except:
         return val
 
-# ------------------ 실행 ------------------
 tickers = get_sp500_tickers()
 top100_df = get_marketcap_top100(tickers)
 ticker_list = top100_df['Ticker'].tolist()
 ticker_map = dict(zip(top100_df['Ticker'], top100_df['Name']))
 
-# ⭐ 강조 기업 선택
+# 강조 기업 선택
 starred = st.multiselect("⭐ 강조할 기업 선택", ticker_list)
 
-# ✔️ 이름 표시 여부
+# 이름 표시 여부
 show_name = st.checkbox("기업 이름 표시", value=True)
 
 with st.spinner("📈 주가 데이터를 불러오는 중입니다..."):
-    price_df = get_price_data(ticker_list)
+    # [MODIFIED] ^GSPC 추가 다운로드
+    price_df = get_price_data(ticker_list + ['^GSPC'])
 
-    # ⛔ 가격 데이터 없는 종목 제거
+    # 가용 종목 확인
     available = [t for t in ticker_list if t in price_df.columns and not price_df[t].dropna().empty]
 
-    # ✅ 수익률 계산 (5년 제거, 3개월 추가)
+    # 수익률 계산 기간
     periods = {
         '1일': 1,
         '1주일': 5,
@@ -92,22 +89,22 @@ with st.spinner("📈 주가 데이터를 불러오는 중입니다..."):
 
     returns_df = calculate_returns(price_df[available], periods).fillna('-')
 
-    # ✅ 시총 순서 유지
+    # 시가총액 순서 유지
     sorted_available = [t for t in ticker_list if t in available]
     returns_df = returns_df.loc[sorted_available]
 
-    # ✅ 평균 수익률 계산 → 맨 위에 고정
-    avg_row = returns_df.replace('-', float('nan')).astype(float).mean().round(2)
-    returns_df.loc['S&P500 평균'] = avg_row
+    # [MODIFIED] S&P500 지수 수익률 계산해서 맨 위에 고정
+    sp500_return = calculate_returns(price_df[['^GSPC']], periods).iloc[0]
+    sp500_return.name = 'S&P500 지수'
     returns_df = pd.concat([
-        returns_df.loc[['S&P500 평균']],
-        returns_df.drop(index='S&P500 평균')
+        pd.DataFrame([sp500_return]),
+        returns_df
     ])
 
-    # ✅ 인덱스 표시: 기업명 + 별표
+    # 인덱스 구성
     display_index = []
     for ticker in returns_df.index:
-        if ticker == "S&P500 평균":
+        if ticker == "S&P500 지수":
             display_index.append(ticker)
             continue
         label = f"★ {ticker}" if ticker in starred else ticker
@@ -116,7 +113,7 @@ with st.spinner("📈 주가 데이터를 불러오는 중입니다..."):
         display_index.append(label)
     returns_df.index = display_index
 
-    st.subheader("📋 수익률 비교 (시가총액 TOP 100 기준 + 평균)")
+    st.subheader("📋 수익률 비교 (시가총액 TOP 100 기준 + S&P500 지수)")
     st.dataframe(
         returns_df.style
             .apply(highlight_starred, axis=1)
