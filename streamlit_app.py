@@ -16,13 +16,18 @@ st.markdown("""
 
 st.title("📊 미국 시가총액 상위 100 기업 수익률 대시보드")
 
-# -------- 상위 100 티커 가져오기 --------
+# -------- 상위 100 티커 가져오기 (오류 처리 포함) --------
 @st.cache_data
 def get_top_100_tickers():
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    sp500 = pd.read_html(url)[0]
-    tickers = sp500[['Symbol', 'Security']].head(100)
-    return tickers
+    try:
+        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+        sp500 = pd.read_html(url)[0]
+        tickers = sp500[['Symbol', 'Security']].head(100)
+        return tickers
+    except Exception as e:
+        st.error("❗ S&P500 기업 목록을 불러오는 데 실패했습니다.")
+        st.error(f"에러 내용: {e}")
+        return pd.DataFrame(columns=["Symbol", "Security"])
 
 top100 = get_top_100_tickers()
 ticker_list = top100['Symbol'].tolist()
@@ -30,11 +35,11 @@ company_names = top100['Security'].tolist()
 ticker_map = dict(zip(ticker_list, company_names))
 
 # -------- 사용자 선택 UI --------
-selected = st.multiselect("👑 기업 선택", ticker_list)  # ✅ 기본 선택 없이 전체만 보여줌
+selected = st.multiselect("👑 기업 선택", ticker_list)
 highlighted = st.multiselect("⭐ 강조할 기업 선택", selected)
 show_name = st.checkbox("기업 이름으로 표시", value=True)
 
-# -------- 데이터 수집 --------
+# -------- 가격 데이터 수집 --------
 @st.cache_data
 def get_price_data(tickers):
     end = datetime.today()
@@ -58,14 +63,14 @@ def highlight_favorites(row):
     else:
         return [''] * len(row)
 
-# -------- 안전한 format 함수 --------
+# -------- 안전한 포맷 함수 --------
 def safe_format(val):
     try:
         return f"{val:.2f}"
     except:
         return val
 
-# -------- 수익률 계산 구간 --------
+# -------- 수익률 구간 --------
 periods = {
     '1일': 1,
     '1주일': 5,
